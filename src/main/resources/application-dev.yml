@@ -1,0 +1,50 @@
+oss-path: ENC(Co8SufNkz3wspSNebhKw/2e59+SCLljT8zqsVFJrK4rU6RZtMO7dqQ==)
+jasypt:
+  encryptor:
+    password:
+bot:
+  botName: W
+  websocketUrl: http://127.0.0.1:6700/
+  accessToken: ENC(pIYWHlNgExdCZ4NzhsqvuJ3qLkCwaeSQ)
+server:
+  port: 8088
+  servlet:
+    context-path: /
+spring:
+  # 配置数据源
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ENC(zWdvIrzipsffgT7Hc5Cg+AtpdlHI77prJxHBFK+cZgr/4d4fXI7MXRcFYOMF/SKTsrTAtatCKd6nhdO/G435KR7pKlZvG7Mr9E7NgKFtDXbvytW8T4zXQErwyfCU1vgQyV9GB592u/8=)
+    username: ENC(tbU5hXi0cGaqKbq7CoVwvg==)
+    password: ENC(Zl4dCt3VUAjPVu/CYurAOw3AdIBvv8H8)
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 30000
+      max-lifetime: 500000
+      connection-test-query: SELECT 1
+
+  # redis
+  redis:
+    host: ENC(Cpo2Jt/58QuN/f6qmCWqBcnf3cyQN/11)
+    port: 6379
+    password: ENC(TWD2CXu2zyCpu7J3fTrZqtF23XnIuSC/)
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 3MB
+# mybatis-plus相关配置
+mybatis-plus:
+  # xml扫描，多个目录用逗号或者分号分隔（告诉 Mapper 所对应的 XML 文件位置）
+  mapper-locations: classpath:mapper/*.xml
+  map-underscore-to-camel-case: true
+  # 如果查询结果中包含空值的列，则 MyBatis 在映射的时候，不会映射这个字段
+  call-setters-on-nulls: true
+  # 这个配置会将执行的sql打印出来，在开发或测试的时候可以用
+  log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
