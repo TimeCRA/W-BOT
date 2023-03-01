@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import top.lsyweb.qqbot.exception.ServiceException;
 
 import javax.annotation.Resource;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -103,6 +104,11 @@ public class RedisUtils {
      */
     public Object get(String key) {
         return redisTemplate.opsForValue().get(key);
+    }
+
+    public String getString(String key) {
+        Object o = get(key);
+        return o == null ? null : o.toString();
     }
 
     public Integer getInt(String key) {
