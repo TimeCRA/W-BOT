@@ -78,6 +78,42 @@ else if (valueDto.getId() == 315) {
 }
 ```
 
+#### 3. 拉群
+
+在tbl_group_info中加一条记录。然后管理员输入指令/flush刷新群聊信息。
+
+#### 4. 封群测试
+
+运行GroupSwitch.java中的closeAll方法，关闭所有群聊。测试结束后，使用notifyGroup方法将群聊变成上一次的状态。
+
+#### 5. 明日方舟新增干员
+
+在tbl_agent_info中新增一条记录，注意参数：是否支持公招，是否为限定干员等等。
+
+#### 6. 明日方舟更新寻访UP池
+
+在tbl_system_config中，更改下列项：
+
+```
+recruit_activity_percent：UP率，活动池50，限定池70
+activity_new_up_names：新活动干员。复刻活动不用填，限定时端不用填
+activity_old_up_names：老活动干员。限定池不用填
+normal_six_up_names：标准寻访6星干员
+normal_five_up_names：标准寻访5星干员
+limitive_six_up_names：限定池6星干员。非限定时端不用填
+limitive_run_six_up_names：限定池6星陪跑干员。非限定时端不用填
+limitive_weight_six_up_names：限定池5被权重干员。非限定时端不用填
+limitive_five_up_names：限定池5星干员。非限定时端不用填
+```
+
+#### 7. GPT配置KEY
+
+在tbl_system_config中，ai_chat_config为白名单群聊，例如你的测试群。
+
+ai_chat_keys为JSONObject，键为群号，值为key数组。还有一个default键，白名单群聊如果没有配置key，直接用default中的key。
+
+ai_chat_free_config是GPT试用版的设置。
+
 待完善
 
 ### 反馈与交流
