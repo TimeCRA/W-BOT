@@ -914,8 +914,7 @@ public class SpecialServiceImpl implements SpecialService
 		String tmpPreset = Optional.ofNullable(redisUtils.get(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId()))
 						 .map(Object::toString)
 						 .orElse(pool.AI_CHAT_PRESET.getJSONObject(presetIndex).getString("c"));
-		String preset = tmpPreset.replace("\"", "\\\"") + "现在我要问你第一个问题：" + prompt + "。";
-		preset = preset.replace("\r\n", "");
+		String preset = tmpPreset.replace("{{}}", prompt).replace("\"", "\\\"").replace("\r\n", "");
 		log.info("preset: {}", preset);
 
 		// 获取当前群聊的keys
