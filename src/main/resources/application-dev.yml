@@ -1,4 +1,4 @@
-oss-path: ENC(Co8SufNkz3wspSNebhKw/2e59+SCLljT8zqsVFJrK4rU6RZtMO7dqQ==)
+oss-path: ENC(AuggPS/21zC2HxoCX01RiMYdy8Afow/k/9Yc9ppGe95iGWLOVKLCwg==)
 jasypt:
   encryptor:
     password:
@@ -25,6 +25,9 @@ spring:
       idle-timeout: 30000
       max-lifetime: 500000
       connection-test-query: SELECT 1
+  web:
+    resources:
+      static-locations: classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/,file:/
 
   # redis
   redis:

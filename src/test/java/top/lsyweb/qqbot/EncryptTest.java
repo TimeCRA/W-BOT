@@ -17,6 +17,6 @@ public class EncryptTest
 
 	@Test
 	void encrypt() {
-		System.out.println(encryptor.encrypt("输入你要加密的内容"));
+		System.out.println(encryptor.encrypt(""));
 	}
 }
