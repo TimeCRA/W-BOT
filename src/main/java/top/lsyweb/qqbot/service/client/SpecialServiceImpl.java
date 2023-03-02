@@ -995,7 +995,7 @@ public class SpecialServiceImpl implements SpecialService
 
 			JSONObject response = null;
 			try {
-				response = restTemplate.postForObject(chatConfig.getString("api_url"), request, JSONObject.class);
+				response = ProxyRestTemplate.getInstance().postForObject(chatConfig.getString("api_url"), request, JSONObject.class);
 				log.info("AI-response: {}", response);
 				String responseText = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 				int promptTokens = response.getJSONObject("usage").getInteger("prompt_tokens");
@@ -1040,8 +1040,7 @@ public class SpecialServiceImpl implements SpecialService
 					continue;
 				}
 			} catch (Exception e) {
-//				log.error("发生错误，将删除该群聊的Prompt：{}", group.getGroupId());
-//				redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId());
+				log.error("调用OpenAI API失败: {}", e);
 			}
 			break;
 		}
