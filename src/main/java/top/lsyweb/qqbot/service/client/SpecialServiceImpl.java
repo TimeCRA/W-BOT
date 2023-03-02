@@ -1026,7 +1026,7 @@ public class SpecialServiceImpl implements SpecialService
 					memory.add(resultTmp);
 					String memoryPrompt = memory.toJSONString();
 					log.info("memoryPrompt: {}", memoryPrompt);
-					redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), memoryPrompt);
+					redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), memoryPrompt, 60 * chatConfig.getInteger("expire"));
 				}
 			} catch (HttpClientErrorException e) {
 				log.info("AI-CHAT回复异常：{}", e.getMessage());
