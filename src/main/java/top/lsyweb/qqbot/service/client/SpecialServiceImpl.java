@@ -915,7 +915,7 @@ public class SpecialServiceImpl implements SpecialService
 		// 获取当前群聊的keys
 		JSONArray keysArray = pool.AI_CHAT_KEYS.getJSONArray(String.valueOf(group.getGroupId()));
 		JSONObject chatConfig = pool.AI_CHAT_CONFIG;
-		String preset = null;
+		JSONArray preset = new JSONArray(), memory = new JSONArray();
 		if (keysArray == null) {
 			// 如果当前群聊的keys为空，判断是否为白名单群聊
 			if (chatConfig.getJSONArray("whitelist_groups").contains((int)group.getGroupId()) || pool.MASTER_QQ.contains(member.getMemberId())) {
@@ -940,7 +940,11 @@ public class SpecialServiceImpl implements SpecialService
 
 				// 进入试用环节
 				chatConfig = pool.AI_CHAT_FREE_CONFIG;
-				preset = chatConfig.getString("prompt_preset").replace("{{}}", prompt).replace("\r\n", "");
+				preset = JSON.parseArray(chatConfig.getString("prompt_preset").replace("\r\n", ""));
+				JSONObject question = new JSONObject();
+				question.put("role", "user");
+				question.put("content", prompt);
+				preset.add(question);
 				keysArray = pool.AI_CHAT_KEYS.getJSONArray("default");
 				// key截至到0点
 				redisUtils.set(ConstantPool.TOTAL_FREE_USED, totalUsedTime + 1,
@@ -950,14 +954,24 @@ public class SpecialServiceImpl implements SpecialService
 			}
 		}
 
-		if (preset == null) {
+		if (preset.size() == 0) {
+			/**
+			 * 1. 读取预设
+			 * 2. 读取记忆
+			 * 3. 拼接预设和记忆
+			 */
 			int presetIndex = redisUtils.getIntOrDefault(ConstantPool.PERSONAL_SET_KEY + group.getGroupId(), 0);
-			String tmpPreset = Optional.ofNullable(redisUtils.get(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId()))
-									   .map(Object::toString)
-									   .orElse(pool.AI_CHAT_PRESET.getJSONObject(presetIndex).getString("c"));
-			preset = tmpPreset.replace("{{}}", prompt).replace("\r\n", "");
+			JSONArray promptPreset = JSON.parseArray(pool.AI_CHAT_PRESET.getJSONObject(presetIndex).getString("c"));
+			memory = Optional.ofNullable(redisUtils.get(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId()))
+									   .map(o -> JSON.parseArray(o.toString()))
+									   .orElse(new JSONArray());
+			JSONObject question = new JSONObject();
+			question.put("role", "user");
+			question.put("content", prompt);
+			memory.add(question);
+			preset.addAll(promptPreset);
+			preset.addAll(memory);
 		}
-		log.info("preset: {}", preset);
 
 
 		Set<String> invalidKeys = new HashSet<>();
@@ -970,9 +984,9 @@ public class SpecialServiceImpl implements SpecialService
 			headers.setBearerAuth(key);
 
 			// Set request body
+			log.info("preset: {}", preset);
 			JSONObject requestObject = new JSONObject();
-			JSONArray presetArray = JSON.parseArray(preset);
-			requestObject.put("messages", presetArray);
+			requestObject.put("messages", preset);
 			requestObject.put("temperature", chatConfig.getFloatValue("temperature"));
 			requestObject.put("max_tokens", chatConfig.getIntValue("max_tokens"));
 			requestObject.put("model", chatConfig.getString("model"));
@@ -981,7 +995,7 @@ public class SpecialServiceImpl implements SpecialService
 
 			JSONObject response = null;
 			try {
-				response = restTemplate.postForObject(pool.AI_CHAT_CONFIG.getString("api_url"), request, JSONObject.class);
+				response = restTemplate.postForObject(chatConfig.getString("api_url"), request, JSONObject.class);
 				log.info("AI-response: {}", response);
 				String responseText = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 				int promptTokens = response.getJSONObject("usage").getInteger("prompt_tokens");
@@ -996,20 +1010,23 @@ public class SpecialServiceImpl implements SpecialService
 
 				// 在Redis中更新该群的prompt
 				if (promptTokens >= pool.AI_CHAT_CONFIG.getInteger("prompt_token_limit")) {
-					log.info("群聊：{} prompt超过设定上限，将清空prompt", group.getGroupId());
+					log.info("群聊：{}的用户{} prompt超过设定上限，将清空prompt", group.getGroupId(), member.getMemberId());
 					MessageUtil.sendTextMessage(group, "记忆数量超过上限，W已清除在本群的记忆");
-					redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId());
+					redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 				} else if (redisUtils.get(ConstantPool.GROUP_PROMPT_TURN + group.getGroupId()) != null) {
-					JSONObject resultTmp = new JSONObject(), continueQuestion = new JSONObject();
+					// 超过最大记忆限制后，删减最早的一个记忆
+					while (memory.size() >= chatConfig.getInteger("memory_length")) {
+						log.info("群聊：{}的用户{} memory超过设定上限，将删除最早的memory", group.getGroupId(), member.getMemberId());
+						memory.remove(0);
+					}
+
+					JSONObject resultTmp = new JSONObject();
 					resultTmp.put("role", "assistant");
 					resultTmp.put("content", responseText);
-					continueQuestion.put("role", "user");
-					continueQuestion.put("content", "{{}}");
-					presetArray.add(resultTmp);
-					presetArray.add(continueQuestion);
-					String resultPrompt = presetArray.toJSONString();
-					log.info("resultPrompt: {}", resultPrompt);
-					redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId(), resultPrompt);
+					memory.add(resultTmp);
+					String memoryPrompt = memory.toJSONString();
+					log.info("memoryPrompt: {}", memoryPrompt);
+					redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), memoryPrompt);
 				}
 			} catch (HttpClientErrorException e) {
 				log.info("AI-CHAT回复异常：{}", e.getMessage());
@@ -1029,6 +1046,7 @@ public class SpecialServiceImpl implements SpecialService
 			break;
 		}
 
+		// 删除已耗尽额度的key
 		for (String invalidKey : invalidKeys) {
 			pool.AI_CHAT_KEYS.getJSONArray("default").remove(invalidKey);
 			keysArray.remove(invalidKey);
@@ -1043,11 +1061,6 @@ public class SpecialServiceImpl implements SpecialService
 	 * @param content
 	 */
 	public void chatPrompt(Group group, MemberInfo member, KeyValueDto valueDto, String content, Member originMember) {
-		if (!originMember.getRole().equals(ConstantPool.GROUP_OWNER) &&
-				!originMember.getRole().equals(ConstantPool.GROUP_ADMIN)) {
-			MessageUtil.sendTextMessage(group, "只有群主或管理员有权限操作记忆");
-			return;
-		}
 
 		Matcher matcher = PathUtil.getRegex(valueDto.getKey(), content);
 		String type = matcher.group(1), cont = matcher.group(2);
@@ -1062,28 +1075,26 @@ public class SpecialServiceImpl implements SpecialService
 			// 如果超过了预设下标，采取默认设置
 			personalType = personalType >= pool.AI_CHAT_PRESET.size() ? 0 : personalType;
 
-			redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId());
+			redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 			redisUtils.set(ConstantPool.PERSONAL_SET_KEY + group.getGroupId(), personalType);
-			MessageUtil.sendTextMessage(group, "W已将人格重置为 => " +
+			MessageUtil.sendTextMessage(group, "W已将本群的设定重置为 => " +
 					pool.AI_CHAT_PRESET.getJSONObject(personalType).getString("n"));
 		} else if ("查看".equals(type)) {
-			String prompt = redisUtils.getString(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId());
+			String prompt = redisUtils.getString(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 			if (prompt == null) {
 				MessageUtil.sendTextMessage(group, "W在本群还没有记忆哦");
 				return;
 			}
 			JSONArray promptArray = JSON.parseArray(prompt);
-			StringBuilder result = new StringBuilder();
+			StringBuilder result = new StringBuilder("在本群，你的记忆如下：");
 			for (Object o : promptArray) {
 				JSONObject obj = (JSONObject) o;
-				result.append(obj.getString("role")).append(": ").append(obj.getString("content")).append("\n");
+				result.append("\n").append(obj.getString("role")).append(": ").append(obj.getString("content"));
 			}
 			MessageUtil.sendTextMessage(group, result.toString());
-		} else {
-			if (cont != null) {
-				redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId(), cont.trim().replaceAll("[\r\n]", ""));
-			}
-			MessageUtil.sendTextMessage(group, "记忆更新完毕！");
+		} else if ("清除".equals(type)) {
+			redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
+			MessageUtil.sendTextMessage(group, "你在本群的记忆清除完毕！");
 		}
 	}
 
