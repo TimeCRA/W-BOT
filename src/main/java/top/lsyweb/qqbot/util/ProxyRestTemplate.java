@@ -20,6 +20,8 @@ public class ProxyRestTemplate
 			InetSocketAddress address = new InetSocketAddress("127.0.0.1", 7890);
 			Proxy proxy = new Proxy(Proxy.Type.HTTP, address);
 			factory.setProxy(proxy);
+			factory.setConnectTimeout(5000);
+			factory.setReadTimeout(20000);
 			return new RestTemplate(factory);
 		}
 

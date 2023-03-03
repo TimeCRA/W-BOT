@@ -44,7 +44,7 @@ public class UrlTest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth("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");
+        headers.setBearerAuth("");
 
         // Set request body
         JSONObject objects = new JSONObject();

@@ -200,11 +200,6 @@ public class SystemConfigPool
 	public JSONObject AI_CHAT_CONFIG;
 
 	/**
-	 * AI-CHAT预设文本
-	 */
-	public JSONArray AI_CHAT_PRESET;
-
-	/**
 	 * AI-CHAT API-KEY
 	 * 每个群对应一个KEY数组
 	 */
@@ -264,7 +259,6 @@ public class SystemConfigPool
 		this.YUGIOH_NAME_MAP = configs.getJsonObject("yugioh_name_map");
 
 		this.AI_CHAT_CONFIG = configs.getJsonObject("ai_chat_config");
-		this.AI_CHAT_PRESET = configs.getJSONArray("ai_chat_preset");
 		this.AI_CHAT_KEYS = configs.getJsonObject("ai_chat_keys");
 		this.AI_CHAT_FREE_CONFIG = configs.getJsonObject("ai_chat_free_config");
 	}

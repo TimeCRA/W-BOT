@@ -26,11 +26,9 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import top.lsyweb.qqbot.config.RemoteOcr;
 import top.lsyweb.qqbot.controller.oms.HealthController;
-import top.lsyweb.qqbot.dto.AgentDto;
-import top.lsyweb.qqbot.dto.AgentPair;
-import top.lsyweb.qqbot.dto.KeyValueDto;
-import top.lsyweb.qqbot.dto.VariablePool;
+import top.lsyweb.qqbot.dto.*;
 import top.lsyweb.qqbot.entity.AgentInfo;
+import top.lsyweb.qqbot.entity.ChatPreset;
 import top.lsyweb.qqbot.entity.MemberInfo;
 import top.lsyweb.qqbot.entity.ValueInfo;
 import top.lsyweb.qqbot.exception.ServiceException;
@@ -913,9 +911,11 @@ public class SpecialServiceImpl implements SpecialService
 		final String prompt = matcher.group(1);
 
 		// 获取当前群聊的keys
+		Map<Integer, ChatPresetDto> presetMap = variablePool.getChatPresetMap();
 		JSONArray keysArray = pool.AI_CHAT_KEYS.getJSONArray(String.valueOf(group.getGroupId()));
 		JSONObject chatConfig = pool.AI_CHAT_CONFIG;
-		JSONArray preset = new JSONArray(), memory = new JSONArray();
+		ChatPresetDto preset = null;
+		JSONArray memory = new JSONArray();
 		if (keysArray == null) {
 			// 如果当前群聊的keys为空，判断是否为白名单群聊
 			if (chatConfig.getJSONArray("whitelist_groups").contains((int)group.getGroupId()) || pool.MASTER_QQ.contains(member.getMemberId())) {
@@ -940,11 +940,7 @@ public class SpecialServiceImpl implements SpecialService
 
 				// 进入试用环节
 				chatConfig = pool.AI_CHAT_FREE_CONFIG;
-				preset = JSON.parseArray(chatConfig.getString("prompt_preset").replace("\r\n", ""));
-				JSONObject question = new JSONObject();
-				question.put("role", "user");
-				question.put("content", prompt);
-				preset.add(question);
+				preset = presetMap.getOrDefault(10000, presetMap.get(0));
 				keysArray = pool.AI_CHAT_KEYS.getJSONArray("default");
 				// key截至到0点
 				redisUtils.set(ConstantPool.TOTAL_FREE_USED, totalUsedTime + 1,
@@ -954,23 +950,16 @@ public class SpecialServiceImpl implements SpecialService
 			}
 		}
 
-		if (preset.size() == 0) {
+		if (preset == null) {
 			/**
 			 * 1. 读取预设
 			 * 2. 读取记忆
-			 * 3. 拼接预设和记忆
 			 */
 			int presetIndex = redisUtils.getIntOrDefault(ConstantPool.PERSONAL_SET_KEY + group.getGroupId(), 0);
-			JSONArray promptPreset = JSON.parseArray(pool.AI_CHAT_PRESET.getJSONObject(presetIndex).getString("c"));
+			preset = presetMap.getOrDefault(presetIndex, presetMap.get(0));
 			memory = Optional.ofNullable(redisUtils.get(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId()))
 									   .map(o -> JSON.parseArray(o.toString()))
 									   .orElse(new JSONArray());
-			JSONObject question = new JSONObject();
-			question.put("role", "user");
-			question.put("content", prompt);
-			memory.add(question);
-			preset.addAll(promptPreset);
-			preset.addAll(memory);
 		}
 
 
@@ -984,13 +973,19 @@ public class SpecialServiceImpl implements SpecialService
 			headers.setBearerAuth(key);
 
 			// Set request body
-			log.info("preset: {}", preset);
+			JSONArray queryArray = new JSONArray(preset.getMessageArray().toJavaList(Object.class));
+			JSONObject question = new JSONObject();
+			question.put("role", "user");
+			question.put("content", prompt);
+			queryArray.addAll(memory);
+			queryArray.add(question);
+			log.info("preset: {}", queryArray);
+
 			JSONObject requestObject = new JSONObject();
-			requestObject.put("messages", preset);
-			requestObject.put("temperature", chatConfig.getFloatValue("temperature"));
-			requestObject.put("max_tokens", chatConfig.getIntValue("max_tokens"));
+			requestObject.put("messages", queryArray);
+			requestObject.put("temperature", Double.parseDouble(preset.getTemperature()));
+			requestObject.put("max_tokens", preset.getMaxTokens());
 			requestObject.put("model", chatConfig.getString("model"));
-			requestObject.put("stop", chatConfig.getString("stop"));
 			HttpEntity<String> request = new HttpEntity<>(requestObject.toJSONString(), headers);
 
 			JSONObject response = null;
@@ -1009,7 +1004,7 @@ public class SpecialServiceImpl implements SpecialService
 				}
 
 				// 在Redis中更新该群的prompt
-				if (promptTokens >= pool.AI_CHAT_CONFIG.getInteger("prompt_token_limit")) {
+				if (promptTokens >= chatConfig.getInteger("prompt_token_limit")) {
 					log.info("群聊：{}的用户{} prompt超过设定上限，将清空prompt", group.getGroupId(), member.getMemberId());
 					MessageUtil.sendTextMessage(group, "记忆数量超过上限，W已清除在本群的记忆");
 					redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
@@ -1023,6 +1018,7 @@ public class SpecialServiceImpl implements SpecialService
 					JSONObject resultTmp = new JSONObject();
 					resultTmp.put("role", "assistant");
 					resultTmp.put("content", responseText);
+					memory.add(question);
 					memory.add(resultTmp);
 					String memoryPrompt = memory.toJSONString();
 					log.info("memoryPrompt: {}", memoryPrompt);
@@ -1072,12 +1068,12 @@ public class SpecialServiceImpl implements SpecialService
 		} else if ("重置".equals(type)) {
 			int personalType = StringUtils.isNumeric(cont) && !cont.isEmpty() ? Integer.parseInt(cont) : 0;
 			// 如果超过了预设下标，采取默认设置
-			personalType = personalType >= pool.AI_CHAT_PRESET.size() ? 0 : personalType;
+			personalType = variablePool.getChatPresetMap().containsKey(personalType) ? personalType : 0;
 
 			redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 			redisUtils.set(ConstantPool.PERSONAL_SET_KEY + group.getGroupId(), personalType);
 			MessageUtil.sendTextMessage(group, "W已将本群的设定重置为 => " +
-					pool.AI_CHAT_PRESET.getJSONObject(personalType).getString("n"));
+					variablePool.getChatPresetMap().get(personalType).getDesc());
 		} else if ("查看".equals(type)) {
 			String prompt = redisUtils.getString(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 			if (prompt == null) {

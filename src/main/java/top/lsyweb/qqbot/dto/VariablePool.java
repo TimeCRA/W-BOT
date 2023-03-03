@@ -3,6 +3,7 @@ package top.lsyweb.qqbot.dto;
 import lombok.Data;
 import org.springframework.stereotype.Component;
 import top.lsyweb.qqbot.entity.AgentInfo;
+import top.lsyweb.qqbot.entity.ChatPreset;
 import top.lsyweb.qqbot.entity.MemberInfo;
 import top.lsyweb.qqbot.entity.SystemConfig;
 
@@ -53,6 +54,11 @@ public class VariablePool
 
 	// 活动非UP池
 	private Map<Integer, List<AgentInfo>> limitative;
+
+	/**
+	 * AI预设消息
+	 */
+	private Map<Integer, ChatPresetDto> chatPresetMap;
 
 	// 图片统计池 (Map<群号, Map<图片CODE, 次数>>)
 	// private Map<Long, Map<Long, ImageCodeDto>> imageCodeMap = new HashMap<>();

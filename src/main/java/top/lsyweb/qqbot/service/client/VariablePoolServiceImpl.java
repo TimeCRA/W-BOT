@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import top.lsyweb.qqbot.dto.AgentDto;
+import top.lsyweb.qqbot.dto.ChatPresetDto;
 import top.lsyweb.qqbot.dto.KeyValueDto;
 import top.lsyweb.qqbot.dto.VariablePool;
 import top.lsyweb.qqbot.entity.*;
@@ -17,6 +18,7 @@ import top.lsyweb.qqbot.util.config.SystemConfigPool;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,6 +33,7 @@ public class VariablePoolServiceImpl implements VariablePoolService
 	private ValueService valueService;
 	private AgentService agentService;
 	private SystemConfigService systemConfigService;
+	private ChatPresetService chatPresetService;
 	private SystemConfigPool pool;
 
 
@@ -38,7 +41,7 @@ public class VariablePoolServiceImpl implements VariablePoolService
 	@Autowired
 	public VariablePoolServiceImpl(VariablePool variablePool, GroupService groupService, MemberService memberService,
 								   KeyService keyService, ValueService valueService, AgentService agentService,
-								   SystemConfigService systemConfigService, SystemConfigPool pool) {
+								   SystemConfigService systemConfigService, ChatPresetService chatPresetService, SystemConfigPool pool) {
 		this.variablePool = variablePool;
 		this.groupService = groupService;
 		this.memberService = memberService;
@@ -46,6 +49,7 @@ public class VariablePoolServiceImpl implements VariablePoolService
 		this.valueService = valueService;
 		this.agentService = agentService;
 		this.systemConfigService = systemConfigService;
+		this.chatPresetService = chatPresetService;
 		this.pool = pool;
 	}
 
@@ -61,6 +65,18 @@ public class VariablePoolServiceImpl implements VariablePoolService
 		refreshJrrp();
 		refreshAgentInfo();
 		refreshRecruit();
+		refreshChatPreset();
+	}
+
+	/**
+	 * 刷新AI聊天预设信息
+	 */
+	private void refreshChatPreset() {
+		List<ChatPreset> chatPresets = chatPresetService.list();
+		Map<Integer, ChatPresetDto> chatPresetMap = chatPresets.stream().collect(
+				Collectors.toConcurrentMap(ChatPreset::getPresetId, ChatPresetDto::new));
+		variablePool.setChatPresetMap(chatPresetMap);
+		log.info("刷新“AI预设人格”完成");
 	}
 
 	/**

@@ -350,7 +350,7 @@ public class GroupMessageServiceImpl implements GroupMessageService {
 					} else if (valueDto.getId() == 260) {
 						specialService.yugiohSearch(group, member, valueDto, content);
 						return true;
-					} else if (valueDto.getId() == 314) {
+					} else if (valueDto.getId() == 314 || valueDto.getId() == 317) {
 						specialService.chatPrompt(group, member, valueDto, content, originMember);
 						return true;
 					} else if (valueDto.getId() == 1000) {
