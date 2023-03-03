@@ -103,9 +103,9 @@ public class GroupMessageServiceImpl implements GroupMessageService {
         boolean isReferenced = false;
         String content = msg.trim();
 		for (String name : pool.NAMES) {
-			if (msg.startsWith(name)) {
+			if (content.startsWith(name)) {
 				isReferenced = true;
-				content = content.replaceFirst(name, "");
+				content = content.replaceFirst(name, "").trim();
 				break;
 			}
 		}
