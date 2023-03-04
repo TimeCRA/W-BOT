@@ -24,9 +24,10 @@ public class KeyPermissions
 	KeyService keyService;
 
 	// 指定群聊
-	Integer group = 647340514;
+	Integer group = 559245239;
 	// 禁止或只开启哪些keyId
-	List<Integer> keyIdArray = Arrays.asList(9, 9, 17, 17, 260, 260); // 游戏王只查卡+今日人品 open
+//	List<Integer> keyIdArray = Arrays.asList(4, 4, 17, 17, 260, 260); // 游戏王只查卡+今日人品 open
+	List<Integer> keyIdArray = Arrays.asList(17, 17, 317, 1000); // AI聊天相关 open
 //	List<Integer> keyIdArray = Arrays.asList(17, 17, 260, 304); // 游戏王+表情组 open
 //	List<Integer> keyIdArray = Arrays.asList(5,6,26,27,312,313); // 游戏王+聊天 ban
 //	List<Integer> keyIdArray = Arrays.asList(5,6,26,27,36,36,42,42,312,313); // 游戏王+聊天+禁止签到相关 ban
