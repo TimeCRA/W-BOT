@@ -1125,6 +1125,25 @@ public class SpecialServiceImpl implements SpecialService
 			promptArray.add(0, headNode);
 			redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), promptArray.toJSONString(), 600);
 			MessageUtil.sendTextMessage(group, "自定义记忆成功！");
+		} else if ("导出".equals(type)) {
+			String prompt = redisUtils.getString(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
+			if (prompt == null) {
+				MessageUtil.sendTextMessage(group, "W在本群还没有记忆哦");
+				return;
+			}
+			MessageUtil.sendTextMessage(group, prompt);
+		} else if ("导入".equals(type)) {
+			if (cont.trim().isEmpty()) {
+				MessageUtil.sendTextMessage(group, "记忆不可为空");
+				return;
+			}
+			try {
+				Object o = JSON.parse(cont.trim());
+				redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), cont.trim(), 600);
+				MessageUtil.sendTextMessage(group, "导入记忆成功！");
+			} catch (Exception e) {
+				MessageUtil.sendTextMessage(group, "格式错误，请直接复制“导出记忆”的全部内容");
+			}
 		}
 	}
 
