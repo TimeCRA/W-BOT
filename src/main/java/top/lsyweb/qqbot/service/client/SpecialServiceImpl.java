@@ -1042,10 +1042,10 @@ public class SpecialServiceImpl implements SpecialService
 						if (presetIndex == 100) {
 							// 自定义人格
 							memory.remove(2);
-							memory.remove(3);
+							memory.remove(2);
 						} else {
 							memory.remove(0);
-							memory.remove(1);
+							memory.remove(0);
 						}
 					}
 
