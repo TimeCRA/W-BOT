@@ -928,6 +928,7 @@ public class SpecialServiceImpl implements SpecialService
 				int freeLimit = chatConfig.getInteger("freePerDay"), memberFreePerDay = chatConfig.getInteger("memberFreePerDay");
 
 				if (totalUsedTime >= freeLimit) {
+					log.info("Ai回复每日试用使用次数已达到上限");
 					return;
 				}
 
@@ -988,16 +989,41 @@ public class SpecialServiceImpl implements SpecialService
 			HttpEntity<String> request = new HttpEntity<>(requestObject.toJSONString(), headers);
 
 			JSONObject response = null;
+			int retry = 0;
+			while (retry < 3) {
+				try {
+					response = ProxyRestTemplate.getInstance().postForObject(chatConfig.getString("api_url"), request, JSONObject.class);
+					log.info("AI-response: {}", response);
+					break;
+				} catch (HttpClientErrorException e) {
+					log.info("AI-CHAT回复异常：{}", e.getMessage());
+					// 判断是额度不足的类型
+					if (e.getRawStatusCode() == 429 && e.getMessage().contains("insufficient_quota")) {
+						invalidKeys.add(key);
+						log.info("Key：{}已耗尽额度，自动切换到下一个Key", key);
+						retry= 1000;
+						break;
+					} else if (e.getRawStatusCode() == 429 && e.getMessage().contains("Rate limit")) {
+						log.info("Key：{}被限速，自动切换到下一个Key", key);
+						retry= 1000;
+						break;
+					}
+				} catch (Exception e) {
+					log.error("调用OpenAI报错：{}", e);
+					retry++;
+				}
+			}
+			if (retry == 1000) {
+				continue;
+			} else if (retry == 3) {
+				MessageUtil.sendTextMessage(group, "W-无响应，请过几秒再试~", member.getMemberId(), MessageUtil.PRE);
+				return;
+			}
+
+
 			try {
-				response = ProxyRestTemplate.getInstance().postForObject(chatConfig.getString("api_url"), request, JSONObject.class);
-				log.info("AI-response: {}", response);
 				String responseText = response.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
 				int totalTokens = response.getJSONObject("usage").getInteger("total_tokens");
-
-				if (responseText.contains("\n\n")) {
-					responseText = responseText.substring(responseText.indexOf("\n\n") + 2);
-				}
-
 				if (!responseText.isEmpty()) {
 					MessageUtil.sendTextMessage(group, responseText, messageId);
 				}
@@ -1011,10 +1037,16 @@ public class SpecialServiceImpl implements SpecialService
 					}
 				} else if (redisUtils.get(ConstantPool.GROUP_PROMPT_TURN + group.getGroupId()) != null) {
 					// 超过最大记忆限制后，删减最早的一个记忆
-					while (memory.size() >= chatConfig.getInteger("memory_length")) {
+					while (memory.size() >= preset.getMemorySize()) {
 						log.info("群聊：{}的用户{} memory超过设定上限，将删除最早的memory", group.getGroupId(), member.getMemberId());
-						memory.remove(0);
-						memory.remove(1);
+						if (presetIndex == 100) {
+							// 自定义人格
+							memory.remove(2);
+							memory.remove(3);
+						} else {
+							memory.remove(0);
+							memory.remove(1);
+						}
 					}
 
 					JSONObject resultTmp = new JSONObject();
@@ -1026,19 +1058,8 @@ public class SpecialServiceImpl implements SpecialService
 					log.info("memoryPrompt: {}", memoryPrompt);
 					redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), memoryPrompt, 60 * chatConfig.getInteger("expire"));
 				}
-			} catch (HttpClientErrorException e) {
-				log.info("AI-CHAT回复异常：{}", e.getMessage());
-				// 判断是额度不足的类型
-				if (e.getRawStatusCode() == 429 && e.getMessage().contains("insufficient_quota")) {
-					invalidKeys.add(key);
-					log.info("Key：{}已耗尽额度，自动切换到下一个Key", key);
-					continue;
-				} else if (e.getRawStatusCode() == 429 && e.getMessage().contains("Rate limit")) {
-					log.info("Key：{}被限速，自动切换到下一个Key", key);
-					continue;
-				}
 			} catch (Exception e) {
-				log.error("调用OpenAI API失败: {}", e);
+				log.error("获取gpt返回结果后，解析内容或操作记忆失败: {}", e);
 			}
 			break;
 		}
@@ -1092,6 +1113,18 @@ public class SpecialServiceImpl implements SpecialService
 		} else if ("清除".equals(type)) {
 			redisUtils.del(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
 			MessageUtil.sendTextMessage(group, "你在本群的记忆清除完毕！");
+		} else if ("自定义".equals(type)) {
+			String prompt = redisUtils.getString(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId());
+			JSONArray promptArray = JSON.parseArray(prompt);
+			if (promptArray == null) {
+				promptArray = new JSONArray();
+			}
+			JSONObject headNode = new JSONObject();
+			headNode.put("role", "system");
+			headNode.put("content", cont.trim());
+			promptArray.add(0, headNode);
+			redisUtils.set(ConstantPool.GROUP_PROMPT_KEY + group.getGroupId() + member.getMemberId(), promptArray.toJSONString(), 600);
+			MessageUtil.sendTextMessage(group, "自定义记忆成功！");
 		}
 	}
 

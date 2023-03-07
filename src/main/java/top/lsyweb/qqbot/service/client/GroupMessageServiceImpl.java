@@ -77,6 +77,7 @@ public class GroupMessageServiceImpl implements GroupMessageService {
     	log.info("群聊{}({})接收到用户{}({})发出的消息：{}, 消息id：{}",
 				 group.getGroupName(), group.getGroupId(), member.getNickname(), member.getUserId(), msg, messageId);
 
+		msg = msg.replaceAll("reply\\[-?\\d+\\]@\\d+\\s+", "");
 
 		/**
 		 * 该流程必须放在头部

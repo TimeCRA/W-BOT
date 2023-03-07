@@ -21,6 +21,7 @@ public class ChatPreset {
   private String messages;
   private String temperature;
   private Integer maxTokens;
+  private Integer memorySize;
 
   public ChatPreset(ChatPreset chatPreset) {
     this.id = chatPreset.id;
@@ -30,5 +31,6 @@ public class ChatPreset {
     this.messages = chatPreset.messages;
     this.temperature = chatPreset.temperature;
     this.maxTokens = chatPreset.maxTokens;
+    this.memorySize = chatPreset.memorySize;
   }
 }
